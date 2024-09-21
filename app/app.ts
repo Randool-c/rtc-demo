@@ -20,6 +20,10 @@ app.all('*', (req, res, next) => {
   }
 })
 
+app.get('/', (req, res) => {
+  res.sendFile('./index.html')
+})
+
 const httpServer = http.createServer(app)
 httpServer.listen(80, '0.0.0.0')
 
