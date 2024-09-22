@@ -19,6 +19,7 @@
     "sass": "^1.79.3",
     "socket.io": "^4.7.5",
     "tsx": "^4.19.1",
+    "socket.io-client": "^4.8.0",
     "vue": "^3.4.29"
   },
   "devDependencies": {
