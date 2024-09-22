@@ -30,7 +30,7 @@ app.get('/', (req, res) => {
 })
 
 const httpServer = http.createServer(app)
-httpServer.listen(8080, 'localhost')
+httpServer.listen(80, 'localhost')
 
 const options = {
   key: fs.readFileSync(path.resolve(__dirname, './cert/iroii.buzz.key')),
@@ -47,15 +47,16 @@ io.on('connection', (socket) => {
 
   socket.on('join', (room: string) => {
     const currentRoom: Set<string> | undefined = io.sockets.adapter.rooms[room]
+    logger.debug(`rooms: ${JSON.stringify(io.sockets.adapter.rooms.entries())}`)
     // const currentRoom = socket.rooms[room]
     const nUsers = currentRoom?.size ?? 0
-    logger.debug(`room ${room} has ${nUsers} users`)
+    logger.debug(`room ${room} has ${nUsers} users for socket id ${socket.id}`)
 
     if (nUsers < MAX_USER) {
       socket.join(room);
       socket.emit('joined', room, socket.id)
 
-      if (nUsers > 1) {
+      if (nUsers >= 1) {
         socket.to(room).emit('other join', room, socket.id)
       }
     } else {
@@ -75,4 +76,4 @@ io.on('connection', (socket) => {
   })
 })
 
-httpsServer.listen(8081, '0.0.0.0')
+httpsServer.listen(443, '0.0.0.0')

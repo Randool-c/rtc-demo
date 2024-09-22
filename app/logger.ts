@@ -4,7 +4,7 @@ log4js.configure({
   appenders: {
     file: {
       type: 'file',
-      filename: 'app.log',
+      filename: './app/app.log',
       layout: {
         type: 'pattern',
         pattern: '%r %p - %m'
