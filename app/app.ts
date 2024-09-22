@@ -46,21 +46,15 @@ io.on('connection', (socket) => {
   })
 
   socket.on('join', async (room: string) => {
-    const currentRoom: Set<string> | undefined = io.sockets.adapter.rooms[room]
-    logger.debug(`rooms: ${JSON.stringify(io.sockets.adapter.rooms.entries())}`)
-    // const currentRoom = socket.rooms[room]
-    const nUsers = currentRoom?.size ?? 0
+    const nUsers = (await io.in(room).allSockets()).size
     logger.debug(`room ${room} has ${nUsers} users for socket id ${socket.id}`)
 
     if (nUsers < MAX_USER) {
       await socket.join(room);
       socket.emit('joined', room, socket.id)
-      logger.debug('users: ', io.sockets.adapter.rooms[room]?.size ?? 0)
-      const allSockets = await io.in(room).allSockets()
-      logger.debug('users2: ', allSockets?.size ?? 0)
 
       if (nUsers >= 1) {
-        socket.to(room).emit('other join', room, socket.id)
+        socket.to(room).emit('other_join', room, socket.id)
       }
     } else {
       // 人满
@@ -68,11 +62,10 @@ io.on('connection', (socket) => {
     }
   })
  
-  socket.on('leave', (room) => {
+  socket.on('leave', async (room) => {
     socket.leave(room)
 
-    const currentRoom = io.sockets.adapter.rooms[room]
-    const nUsers = currentRoom?.size ?? 0
+    const nUsers = (await io.in(room).allSockets()).size
     logger.debug(`room has ${nUsers} users now`)
     socket.to(room).emit('bye', room, socket.id)
     socket.emit('left', room, socket.id)

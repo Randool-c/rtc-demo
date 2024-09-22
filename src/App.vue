@@ -14,7 +14,7 @@
     <div class="videos">
       <div class="video-wrapper">
         <div class="video-wrapper__title">{{ state === 'joined' ? 'local' : '' }}</div>
-        <video class="video-wrapper__video videos-wrapper__local" playsinline autoplay ref="localVideoRef"/>
+        <video class="video-wrapper__video videos-wrapper__local" playsinline autoplay ref="localVideoRef" />
       </div>
       <div class="video-wrapper">
         <div class="video-wrapper__title">{{ remoteUser }}</div>
@@ -47,7 +47,15 @@ const remoteUser = ref<string>('')
 let currentPc: null | RTCPeerConnection = null;
 let localStream: null | MediaStream = null;
 
-const enterRoom = () =>{
+const enterRoom = async () => {
+  // 创建rtcpeerconnection
+  if (!localStream) {
+    try {
+      localStream = await getLocalStreams()
+    } catch (err) {
+      console.error(err)
+    }
+  }
   socket?.emit('join', roomId.value)
 }
 
@@ -86,7 +94,7 @@ const createConnection = async () => {
   if (!currentPc) return
 
   const offer = await currentPc.createOffer()
-  console.log(`c  ate offer ${offer} to the end`)
+  console.log(`create offer ${offer} to the end`)
   await currentPc.setLocalDescription(offer)
   sendMessage(roomId.value, offer)
 }
@@ -107,19 +115,14 @@ socket.on('joined', async (roomId, socketId) => {
   console.log(`received joined message; room id is: ${roomId}; socket id is: ${socketId}`)
   state.value = 'joined'
 
-  // 创建rtcpeerconnection
-  try {
-    localStream = await getLocalStreams()
-  } catch (err) {
-    console.error(err)
-  }
-  
   localVideoRef.value.srcObject = localStream
   currentPc = createRTCPeerConnection(localStream)
   initRTCPeerConnection()
+  console.log('current pc: ', currentPc)
 })
 
-socket.on('other join', async (roomId, socketId) => {
+socket.on('other_join', (roomId, socketId) => {
+  console.log(`other end join; roomId: ${roomId} socketId: ${socketId}`)
   remoteUser.value = socketId
   createConnection()
 })
@@ -143,7 +146,7 @@ socket.on('bye', (roomId, socketId) => {
 })
 
 socket.on('message', async (roomId: string, data: RTCMessage) => {
-  console.log(`received message; room id is ${roomId}; data is ${data}`)
+  console.log(`received message type ${data.type}; room id is ${roomId}; data is ${JSON.stringify(data)}`)
   if (!data || !currentPc) return
   switch (data.type) {
     case 'candidate': {
@@ -159,6 +162,7 @@ socket.on('message', async (roomId: string, data: RTCMessage) => {
       currentPc.setRemoteDescription(data)
       const answer = await currentPc.createAnswer()
       currentPc.setLocalDescription(answer)
+      console.log(`create answer ${answer}`)
       sendMessage(roomId, answer)
     }
   }
@@ -172,8 +176,8 @@ onBeforeUnmount(() => {
 <style lang="scss" scoped>
 .video-wrapper {
   &__video {
-    width: 840px;
-    height: 460px;
+    width: 640px;
+    height: 360px;
     object-fit: cover;
     object-position: 50% 50%;
   }
