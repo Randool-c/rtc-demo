@@ -45,7 +45,7 @@ io.on('connection', (socket) => {
     socket.to(room).emit('message', room, data)
   })
 
-  socket.on('join', (room: string) => {
+  socket.on('join', async (room: string) => {
     const currentRoom: Set<string> | undefined = io.sockets.adapter.rooms[room]
     logger.debug(`rooms: ${JSON.stringify(io.sockets.adapter.rooms.entries())}`)
     // const currentRoom = socket.rooms[room]
@@ -53,8 +53,11 @@ io.on('connection', (socket) => {
     logger.debug(`room ${room} has ${nUsers} users for socket id ${socket.id}`)
 
     if (nUsers < MAX_USER) {
-      socket.join(room);
+      await socket.join(room);
       socket.emit('joined', room, socket.id)
+      logger.debug('users: ', io.sockets.adapter.rooms[room]?.size ?? 0)
+      const allSockets = await io.in(room).allSockets()
+      logger.debug('users2: ', allSockets?.size ?? 0)
 
       if (nUsers >= 1) {
         socket.to(room).emit('other join', room, socket.id)
