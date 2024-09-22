@@ -8,6 +8,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const MAX_USER = 2
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const app = express()
 
@@ -22,15 +23,15 @@ app.all('*', (req, res, next) => {
   }
 })
 
+app.use(express.static(path.resolve(__dirname, './dist')))
+
 app.get('/', (req, res) => {
-  res.sendFile(path.resolve(__dirname, './index.html'))
+  res.sendFile(path.resolve(__dirname, './dist/index.html'))
 })
 
 const httpServer = http.createServer(app)
-httpServer.listen(80, '0.0.0.0')
+httpServer.listen(8080, 'localhost')
 
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const options = {
   key: fs.readFileSync(path.resolve(__dirname, './cert/iroii.buzz.key')),
   cert: fs.readFileSync(path.resolve(__dirname, './cert/iroii.buzz_bundle.pem'))
@@ -74,4 +75,4 @@ io.on('connection', (socket) => {
   })
 })
 
-httpsServer.listen(443, '0.0.0.0')
+httpsServer.listen(8081, '0.0.0.0')

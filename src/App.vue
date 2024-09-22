@@ -12,13 +12,13 @@
       </div>
     </div>
     <div class="videos">
-      <div class="video">
-        <div class="video__title">local</div>
-        <video class="videos__video videos__local" playsinline autoplay ref="localVideoRef"/>
+      <div class="video-wrapper">
+        <div class="video-wrapper__title">{{ state === 'joined' ? 'local' : '' }}</div>
+        <video class="video-wrapper__video videos-wrapper__local" playsinline autoplay ref="localVideoRef"/>
       </div>
-      <div class="video">
-        <div class="video__title">{{ remoteUser }}</div>
-        <video class="videos__video videos__remote" playsinline autoplay ref="remoteVideoRef" />
+      <div class="video-wrapper">
+        <div class="video-wrapper__title">{{ remoteUser }}</div>
+        <video class="videos-wrapper__video videos-wrapper__remote" playsinline autoplay ref="remoteVideoRef" />
       </div>
     </div>
     <div class="messages"></div>
@@ -27,7 +27,7 @@
 
 <script lang="ts" setup>
 import { io } from 'socket.io-client';
-import { ref } from 'vue'
+import { onBeforeUnmount, ref } from 'vue'
 import { createRTCPeerConnection, getLocalStreams } from './helpers';
 
 interface RTCCandidateMessage {
@@ -40,7 +40,7 @@ type RTCMessage = RTCCandidateMessage | RTCSessionDescriptionInit
 const localVideoRef = ref()
 const remoteVideoRef = ref()
 
-const roomId = ref('')
+const roomId = ref('test')
 const socket = io()
 const state = ref<'init' | 'joining' | 'joined'>('init')
 const remoteUser = ref<string>('')
@@ -86,7 +86,7 @@ const createConnection = async () => {
   if (!currentPc) return
 
   const offer = await currentPc.createOffer()
-  console.log(`create offer ${offer} to the end`)
+  console.log(`c  ate offer ${offer} to the end`)
   await currentPc.setLocalDescription(offer)
   sendMessage(roomId.value, offer)
 }
@@ -163,7 +163,19 @@ socket.on('message', async (roomId: string, data: RTCMessage) => {
     }
   }
 })
+
+onBeforeUnmount(() => {
+  socket.emit('leave')
+})
 </script>
 
 <style lang="scss" scoped>
+.video-wrapper {
+  &__video {
+    width: 840px;
+    height: 460px;
+    object-fit: cover;
+    object-position: 50% 50%;
+  }
+}
 </style>
