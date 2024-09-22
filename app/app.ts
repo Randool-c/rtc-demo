@@ -21,7 +21,7 @@ app.all('*', (req, res, next) => {
 })
 
 app.get('/', (req, res) => {
-  res.sendFile('./index.html')
+  res.sendFile('./dist/index.html')
 })
 
 const httpServer = http.createServer(app)

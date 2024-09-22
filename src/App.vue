@@ -1,0 +1,169 @@
+<template>
+  <div class="app">
+    <div class="config">
+      <div class="config__inputs">
+        <label for="room-id">room id: </label>
+        <input class="room-id" id="room-id" type="text" v-model="roomId" />
+      </div>
+      <div class="config__submits">
+        <button class="btn-enter" @click="enterRoom">enter</button>
+        <span v-if="state === 'joining'">进入房间中。。。</span>
+        <button class="btn-exit" @click="exitRoom">exit</button>
+      </div>
+    </div>
+    <div class="videos">
+      <div class="video">
+        <div class="video__title">local</div>
+        <video class="videos__video videos__local" playsinline autoplay ref="localVideoRef"/>
+      </div>
+      <div class="video">
+        <div class="video__title">{{ remoteUser }}</div>
+        <video class="videos__video videos__remote" playsinline autoplay ref="remoteVideoRef" />
+      </div>
+    </div>
+    <div class="messages"></div>
+  </div>
+</template>
+
+<script lang="ts" setup>
+import { io } from 'socket.io-client';
+import { ref } from 'vue'
+import { createRTCPeerConnection, getLocalStreams } from './helpers';
+
+interface RTCCandidateMessage {
+  type: 'candidate';
+  candidate: RTCIceCandidate;
+}
+
+type RTCMessage = RTCCandidateMessage | RTCSessionDescriptionInit
+
+const localVideoRef = ref()
+const remoteVideoRef = ref()
+
+const roomId = ref('')
+const socket = io()
+const state = ref<'init' | 'joining' | 'joined'>('init')
+const remoteUser = ref<string>('')
+let currentPc: null | RTCPeerConnection = null;
+let localStream: null | MediaStream = null;
+
+const enterRoom = () =>{
+  socket?.emit('join', roomId.value)
+}
+
+const exitRoom = () => {
+  socket?.emit('leave', roomId.value)
+}
+
+const sendMessage = (roomId: string, data: RTCMessage) => {
+  console.log('send message to other end ', roomId, data)
+  socket?.emit('message', roomId, data)
+}
+
+const initRTCPeerConnection = () => {
+  if (!currentPc) return
+
+  currentPc.onicecandidate = (e) => {
+    if (e.candidate) {
+      console.log(`oncandidate ${JSON.stringify(e.candidate.toJSON())}`)
+      sendMessage(roomId.value, {
+        type: 'candidate',
+        candidate: e.candidate
+      })
+    } else {
+      console.log('ice candidate collection end');
+    }
+  }
+
+  currentPc.ontrack = (event) => {
+    if (remoteVideoRef.value.srcObject !== event.streams[0]) {
+      remoteVideoRef.value.srcObject = event.streams[0]
+    }
+  }
+}
+
+const createConnection = async () => {
+  if (!currentPc) return
+
+  const offer = await currentPc.createOffer()
+  console.log(`create offer ${offer} to the end`)
+  await currentPc.setLocalDescription(offer)
+  sendMessage(roomId.value, offer)
+}
+
+socket.on('connect', () => {
+  console.log('socket connected')
+})
+
+socket.on('connect_error', () => {
+  console.log('socket connect error')
+})
+
+socket.on('disconnect', () => {
+  console.log('disconnect')
+})
+
+socket.on('joined', async (roomId, socketId) => {
+  console.log(`received joined message; room id is: ${roomId}; socket id is: ${socketId}`)
+  state.value = 'joined'
+
+  // 创建rtcpeerconnection
+  try {
+    localStream = await getLocalStreams()
+  } catch (err) {
+    console.error(err)
+  }
+  
+  localVideoRef.value.srcObject = localStream
+  currentPc = createRTCPeerConnection(localStream)
+  initRTCPeerConnection()
+})
+
+socket.on('other join', async (roomId, socketId) => {
+  remoteUser.value = socketId
+  createConnection()
+})
+
+socket.on('left', (roomId, socketId) => {
+  console.log(`received left message; room id is: ${roomId}; socket id is: ${socketId}`)
+  state.value = 'init'
+
+  localStream?.getTracks().forEach((track) => {
+    track.stop()
+  })
+  localVideoRef.value.srcObject = null
+  currentPc?.close()
+  currentPc = null
+  localStream = null
+})
+
+socket.on('bye', (roomId, socketId) => {
+  console.log(`other user left; room id is: ${roomId}; socket id is: ${socketId}`)
+  remoteVideoRef.value.srcObject = null
+})
+
+socket.on('message', async (roomId: string, data: RTCMessage) => {
+  console.log(`received message; room id is ${roomId}; data is ${data}`)
+  if (!data || !currentPc) return
+  switch (data.type) {
+    case 'candidate': {
+      const newCandidate = new RTCIceCandidate(data.candidate)
+      currentPc.addIceCandidate(newCandidate)
+      break;
+    }
+    case 'answer': {
+      currentPc.setRemoteDescription(data)
+      break;
+    }
+    case 'offer': {
+      currentPc.setRemoteDescription(data)
+      const answer = await currentPc.createAnswer()
+      currentPc.setLocalDescription(answer)
+      sendMessage(roomId, answer)
+    }
+  }
+})
+</script>
+
+<style lang="scss" scoped>
+</style>
