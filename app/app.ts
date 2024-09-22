@@ -1,9 +1,11 @@
 import http from 'node:http'
 import https from 'node:https'
 import express from 'express'
-import socketIo from 'socket.io'
+import * as socketIo from 'socket.io'
 import fs from 'node:fs'
 import { logger } from './logger'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const MAX_USER = 2
 
@@ -21,16 +23,17 @@ app.all('*', (req, res, next) => {
 })
 
 app.get('/', (req, res) => {
-  res.sendFile('./index.html')
+  res.sendFile(path.resolve(__dirname, './index.html'))
 })
 
 const httpServer = http.createServer(app)
 httpServer.listen(80, '0.0.0.0')
 
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const options = {
-  key: fs.readFileSync('./cert/iroii.buzz.key'),
-  cert: fs.readFileSync('./cert/iroii.buzz_bundle.pem')
+  key: fs.readFileSync(path.resolve(__dirname, './cert/iroii.buzz.key')),
+  cert: fs.readFileSync(path.resolve(__dirname, './cert/iroii.buzz_bundle.pem'))
 }
 const httpsServer = https.createServer(options, app)
 const io = new socketIo.Server(httpsServer)

@@ -10,14 +10,15 @@
     "build-only": "vite build",
     "type-check": "vue-tsc --build --force",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore",
-    "format": "prettier --write src/"
+    "format": "prettier --write src/",
+    "serve": "tsx app/app.ts"
   },
   "dependencies": {
     "express": "^4.21.0",
     "log4js": "^6.9.1",
     "sass": "^1.79.3",
     "socket.io": "^4.7.5",
-    "ts-node": "^10.9.2",
+    "tsx": "^4.19.1",
     "vue": "^3.4.29"
   },
   "devDependencies": {
