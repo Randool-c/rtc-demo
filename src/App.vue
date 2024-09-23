@@ -37,6 +37,12 @@ interface RTCCandidateMessage {
 
 type RTCMessage = RTCCandidateMessage | RTCSessionDescriptionInit
 
+const RTCConfig = {
+  iceServers: [
+    { urls: 'stun:42.193.125.56:8800', username: 'chenst', password: '123456' },
+  ],
+}
+
 const localVideoRef = ref()
 const remoteVideoRef = ref()
 
@@ -116,9 +122,7 @@ socket.on('joined', async (roomId, socketId) => {
   state.value = 'joined'
 
   localVideoRef.value.srcObject = localStream
-  currentPc = createRTCPeerConnection(localStream, {
-    iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }],
-})
+  currentPc = createRTCPeerConnection(localStream, RTCConfig)
   initRTCPeerConnection()
   console.log('current pc: ', currentPc)
 })
