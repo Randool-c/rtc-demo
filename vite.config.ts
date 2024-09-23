@@ -10,6 +10,7 @@ export default defineConfig({
     vue(),
     vueDevTools(),
   ],
+  base: 'rtc-demo',
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url))
@@ -20,7 +21,7 @@ export default defineConfig({
       output: {
         // dir: './app/dist'
         dir: './docs'
-      }
+      },
     }
   }
 })
