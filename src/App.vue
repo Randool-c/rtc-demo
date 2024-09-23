@@ -48,7 +48,7 @@ const localVideoRef = ref()
 const remoteVideoRef = ref()
 
 const roomId = ref('test')
-const socket = io('https://www.iroii.buzz')
+const socket = io('https://42.193.125.56')
 const state = ref<'init' | 'joining' | 'joined'>('init')
 const remoteUser = ref<string>('')
 let currentPc: null | RTCPeerConnection = null;
