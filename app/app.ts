@@ -58,7 +58,7 @@ io.on('connection', (socket) => {
       }
     } else {
       // 人满
-      socket.to(room).emit('full', room, socket.id)
+      socket.emit('full', room, socket.id)
     }
   })
  
@@ -70,6 +70,7 @@ io.on('connection', (socket) => {
     socket.to(room).emit('bye', room, socket.id)
     socket.emit('left', room, socket.id)
   })
+
 })
 
 httpsServer.listen(443, '0.0.0.0')

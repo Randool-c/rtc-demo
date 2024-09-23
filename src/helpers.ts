@@ -10,8 +10,8 @@ export const getLocalStreams = async () => {
   }
 }
 
-export const createRTCPeerConnection = (stream: MediaStream | null) => {
-  const pc = new RTCPeerConnection()
+export const createRTCPeerConnection = (stream: MediaStream | null, config?: RTCConfiguration) => {
+  const pc = new RTCPeerConnection(config)
   console.log('current stream when create pc ', stream)
   if (stream) {
     const audioTrack = stream.getAudioTracks()[0]

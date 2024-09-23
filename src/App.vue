@@ -116,7 +116,9 @@ socket.on('joined', async (roomId, socketId) => {
   state.value = 'joined'
 
   localVideoRef.value.srcObject = localStream
-  currentPc = createRTCPeerConnection(localStream)
+  currentPc = createRTCPeerConnection(localStream, {
+    iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }],
+})
   initRTCPeerConnection()
   console.log('current pc: ', currentPc)
 })
@@ -166,6 +168,10 @@ socket.on('message', async (roomId: string, data: RTCMessage) => {
       sendMessage(roomId, answer)
     }
   }
+})
+
+socket.on('full', () => {
+  alert('房间已满，请稍后重试')
 })
 
 onBeforeUnmount(() => {
