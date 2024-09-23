@@ -18,7 +18,8 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        dir: './app/dist'
+        // dir: './app/dist'
+        dir: './docs'
       }
     }
   }

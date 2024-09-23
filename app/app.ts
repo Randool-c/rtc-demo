@@ -26,8 +26,7 @@ app.all('*', (req, res, next) => {
 app.use(express.static(path.resolve(__dirname, './dist')))
 
 app.get('/', (req, res) => {
-  // res.sendFile(path.resolve(__dirname, './dist/index.html'))
-  res.sendFile('./index.html')
+  res.sendFile('./index.html', {root: path.resolve(__dirname, './dist')})
 })
 
 const httpServer = http.createServer(app)
