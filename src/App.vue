@@ -39,7 +39,8 @@ type RTCMessage = RTCCandidateMessage | RTCSessionDescriptionInit
 
 const RTCConfig = {
   iceServers: [
-    { urls: 'stun:42.193.125.56:8800', username: 'chenst', password: '123456' },
+    { urls: 'stun:42.193.125.56:8800', username: 'chenst', credential: '123456'},
+    { urls: 'turn:42.193.125.56:8805', username: 'chenst', credential: '123456'}
   ],
 }
 

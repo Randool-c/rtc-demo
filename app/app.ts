@@ -26,11 +26,12 @@ app.all('*', (req, res, next) => {
 app.use(express.static(path.resolve(__dirname, './dist')))
 
 app.get('/', (req, res) => {
-  res.sendFile(path.resolve(__dirname, './dist/index.html'))
+  // res.sendFile(path.resolve(__dirname, './dist/index.html'))
+  res.sendFile('./index.html')
 })
 
 const httpServer = http.createServer(app)
-httpServer.listen(80, 'localhost')
+httpServer.listen(80, '0.0.0.0')
 
 const options = {
   key: fs.readFileSync(path.resolve(__dirname, './cert/iroii.buzz.key')),
