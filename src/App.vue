@@ -19,7 +19,7 @@
         </div>
       </div>
       <div class="remote-video">
-        <div v-for="([remoteUser, _], idx) in sortedConnections" :key="remoteUser" class="video-wrapper">
+        <div v-for="([remoteUser]) in sortedConnections" :key="remoteUser" class="video-wrapper">
           <div class="video-wrapper__title">{{ remoteUser }}</div>
           <video class="videos-wrapper__video" playsinline autoplay ref="remoteVideosRef" />
         </div>
@@ -31,7 +31,7 @@
 
 <script lang="ts" setup>
 import { io } from 'socket.io-client';
-import { computed, nextTick, onBeforeUnmount, ref, watch, watchEffect } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watchEffect } from 'vue'
 import { createRTCPeerConnection, getLocalStreams } from './helpers';
 
 interface RTCCandidateMessage {
@@ -110,12 +110,12 @@ const initRTCPeerConnection = (pc: RTCPeerConnection) => {
   // }
 }
 
-const createConnection = async () => {
-  if (!currentPc) return
+const createConnection = async (pc: RTCPeerConnection) => {
+  if (!pc) return
 
-  const offer = await currentPc.createOffer()
+  const offer = await pc.createOffer()
   console.log(`create offer ${offer} to the end`)
-  await currentPc.setLocalDescription(offer)
+  await pc.setLocalDescription(offer)
   sendMessage(roomId.value, offer)
 }
 
@@ -162,34 +162,37 @@ socket.on('left', (roomId, socketId) => {
     track.stop()
   })
   localVideoRef.value.srcObject = null
-  currentPc?.close()
-  currentPc = null
   localStream = null
+  for (let otherSocket of pcs.value.keys()) {
+    pcs.value.get(otherSocket)?.close()
+    pcs.value.delete(otherSocket)
+  }
 })
 
 socket.on('bye', (roomId, socketId) => {
   console.log(`other user left; room id is: ${roomId}; socket id is: ${socketId}`)
-  remoteVideoRef.value.srcObject = null
-  remoteUser.value = ''
+  pcs.value.get(socketId)?.close()
+  pcs.value.delete(socketId)
 })
 
-socket.on('message', async (roomId: string, data: RTCMessage) => {
+socket.on('message', async (roomId: string, fromSocket: string, data: RTCMessage) => {
   console.log(`received message type ${data.type}; room id is ${roomId}; data is ${JSON.stringify(data)}`)
-  if (!data || !currentPc) return
+  const targetPc = pcs.value.get(fromSocket)
+  if (!data || !targetPc) return
   switch (data.type) {
     case 'candidate': {
       const newCandidate = new RTCIceCandidate(data.candidate)
-      currentPc.addIceCandidate(newCandidate)
+      targetPc.addIceCandidate(newCandidate)
       break;
     }
     case 'answer': {
-      currentPc.setRemoteDescription(data)
+      targetPc.setRemoteDescription(data)
       break;
     }
     case 'offer': {
-      currentPc.setRemoteDescription(data)
-      const answer = await currentPc.createAnswer()
-      currentPc.setLocalDescription(answer)
+      targetPc.setRemoteDescription(data)
+      const answer = await targetPc.createAnswer()
+      targetPc.setLocalDescription(answer)
       console.log(`create answer ${answer}`)
       sendMessage(roomId, answer)
     }
@@ -201,6 +204,15 @@ socket.on('full', () => {
 })
 
 watchEffect(() => {
+  if (remoteVideosRef.value.length !== sortedConnections.value.length) return;
+  const n = remoteVideosRef.value.length
+  for (let i = 0; i < n; ++i) {
+    sortedConnections.value[1][1].ontrack = (event) => {
+      if (remoteVideosRef.value[i].srcObject !== event.streams[0]) {
+        remoteVideosRef.value[i].srcObject = event.streams[0]
+      }
+    }
+  }
 })
 
 onBeforeUnmount(() => {

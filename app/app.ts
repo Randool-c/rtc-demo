@@ -7,7 +7,7 @@ import { logger } from './logger'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const MAX_USER = 2
+const MAX_USER = 5
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const app = express()
@@ -48,7 +48,7 @@ const io = new socketIo.Server(httpsServer, {
 io.on('connection', (socket) => {
   socket.on('message', (room, data) => {
     logger.debug(`message, room: ${room}, data, type: ${data.type}`)
-    socket.to(room).emit('message', room, data)
+    socket.to(room).emit('message', room, socket.id, data)
   })
 
   socket.on('join', async (room: string) => {
