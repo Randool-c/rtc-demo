@@ -13,7 +13,7 @@
     </div>
     <div class="videos">
       <div class="video-wrapper">
-        <div class="video-wrapper__title">{{ state === 'joined' ? 'local' : '' }}</div>
+        <div class="video-wrapper__title">{{ state === 'joined' ? `local` : '' }}</div>
         <video class="video-wrapper__video videos-wrapper__local" playsinline autoplay ref="localVideoRef" />
       </div>
       <div class="video-wrapper">
@@ -40,7 +40,7 @@ type RTCMessage = RTCCandidateMessage | RTCSessionDescriptionInit
 const RTCConfig = {
   iceServers: [
     { urls: 'stun:42.193.125.56:8800', username: 'chenst', credential: '123456'},
-    { urls: 'turns:42.193.125.56:8805', username: 'chenst', credential: '123456'}
+    { urls: 'turn:42.193.125.56:8805', username: 'chenst', credential: '123456'}
   ],
 }
 
@@ -51,6 +51,7 @@ const roomId = ref('test')
 const socket = io('wss://42.193.125.56')
 const state = ref<'init' | 'joining' | 'joined'>('init')
 const remoteUser = ref<string>('')
+const localUser = ref<string>('')
 let currentPc: null | RTCPeerConnection = null;
 let localStream: null | MediaStream = null;
 
@@ -127,6 +128,7 @@ socket.on('joined', async (roomId, socketId) => {
   currentPc = createRTCPeerConnection(localStream, RTCConfig)
   initRTCPeerConnection()
   console.log('current pc: ', currentPc)
+  localUser.value = socketId
 })
 
 socket.on('other_join', (roomId, socketId) => {
@@ -151,6 +153,7 @@ socket.on('left', (roomId, socketId) => {
 socket.on('bye', (roomId, socketId) => {
   console.log(`other user left; room id is: ${roomId}; socket id is: ${socketId}`)
   remoteVideoRef.value.srcObject = null
+  remoteUser.value = ''
 })
 
 socket.on('message', async (roomId: string, data: RTCMessage) => {
