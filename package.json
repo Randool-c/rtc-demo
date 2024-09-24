@@ -12,7 +12,8 @@
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore",
     "format": "prettier --write src/",
     "serve": "vite build && tsx app/app.ts",
-    "node": "tsx app/app.ts"
+    "node": "tsx app/app.ts",
+    "deploy": "vite build && git add . && git commit -m \"deploy\" && git push"
   },
   "dependencies": {
     "express": "^4.21.0",

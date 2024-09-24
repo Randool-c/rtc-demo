@@ -37,7 +37,11 @@ const options = {
   cert: fs.readFileSync(path.resolve(__dirname, './cert/iroii.buzz_bundle.pem'))
 }
 const httpsServer = https.createServer(options, app)
-const io = new socketIo.Server(httpsServer)
+const io = new socketIo.Server(httpsServer, {
+  cors: {
+    origin: '*'
+  }
+})
 
 io.on('connection', (socket) => {
   socket.on('message', (room, data) => {

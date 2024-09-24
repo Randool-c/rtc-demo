@@ -40,7 +40,7 @@ type RTCMessage = RTCCandidateMessage | RTCSessionDescriptionInit
 const RTCConfig = {
   iceServers: [
     { urls: 'stun:42.193.125.56:8800', username: 'chenst', credential: '123456'},
-    { urls: 'turn:42.193.125.56:8805', username: 'chenst', credential: '123456'}
+    { urls: 'turns:42.193.125.56:8805', username: 'chenst', credential: '123456'}
   ],
 }
 
@@ -61,6 +61,7 @@ const enterRoom = async () => {
       localStream = await getLocalStreams()
     } catch (err) {
       console.error(err)
+      alert(err?.toString())
     }
   }
   socket?.emit('join', roomId.value)
