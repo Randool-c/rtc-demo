@@ -84,12 +84,12 @@ const exitRoom = () => {
   socket?.emit('leave', roomId.value)
 }
 
-const sendMessage = (roomId: string, data: RTCMessage) => {
+const sendMessage = (roomId: string, data: RTCMessage, targetSocket?: string) => {
   // console.log('send message to other end ', roomId, data)
-  socket?.emit('message', roomId, data)
+  socket?.emit('message', roomId, data, targetSocket)
 }
 
-const initRTCPeerConnection = (socketId: string, pc: RTCPeerConnection) => {
+const initRTCPeerConnection = (socketId: string, pc: RTCPeerConnection, targetSocket: string) => {
   if (!pc) return
 
   pc.onicecandidate = (e) => {
@@ -98,7 +98,7 @@ const initRTCPeerConnection = (socketId: string, pc: RTCPeerConnection) => {
       sendMessage(roomId.value, {
         type: 'candidate',
         candidate: e.candidate
-      })
+      }, targetSocket)
     } else {
       console.log('ice candidate collection end');
     }
@@ -117,7 +117,7 @@ const initRTCPeerConnection = (socketId: string, pc: RTCPeerConnection) => {
 const createConnections = async (socketIds: string[]) => {
   for (let socketId of socketIds) {
     const newPc = createRTCPeerConnection(localStream, RTCConfig)
-    initRTCPeerConnection(socketId, newPc)
+    initRTCPeerConnection(socketId, newPc, socketId)
     pcs.value.set(socketId, newPc)
   }
 
@@ -178,10 +178,10 @@ socket.on('joined', async (roomId: string, socketId: string, roomSockets: string
 
 socket.on('other_join', async (roomId, socketId) => {
   console.log(`other end join; roomId: ${roomId} socketId: ${socketId}`)
-  remoteUser.value = socketId
-  const newPc = createRTCPeerConnection(localStream, RTCConfig)
-  initRTCPeerConnection(socketId, newPc)
-  pcs.value.set(socketId, newPc)
+  // remoteUser.value = socketId
+  // const newPc = createRTCPeerConnection(localStream, RTCConfig)
+  // initRTCPeerConnection(socketId, newPc)
+  // pcs.value.set(socketId, newPc)
   // await nextTick()
   // console.assert(remoteVideosRef.value.length === sortedConnections.value.length)
   // const index = sortedConnections.value.findIndex(([sid]) => sid === socketId)
@@ -213,8 +213,14 @@ socket.on('bye', (roomId, socketId) => {
 
 socket.on('message', async (roomId: string, fromSocket: string, data: RTCMessage) => {
   console.log(`received message type ${data.type} from ${fromSocket}; room id is ${roomId}; data is ${JSON.stringify(data)}`)
-  const targetPc = pcs.value.get(fromSocket)
-  if (!data || !targetPc) return
+  if (!data) return
+
+  let targetPc = pcs.value.get(fromSocket)
+  if (!targetPc) {
+    targetPc = createRTCPeerConnection(localStream, RTCConfig)
+    initRTCPeerConnection(fromSocket, targetPc, fromSocket)
+    pcs.value.set(fromSocket, targetPc)
+  }
   switch (data.type) {
     case 'candidate': {
       const newCandidate = new RTCIceCandidate(data.candidate)
@@ -230,7 +236,7 @@ socket.on('message', async (roomId: string, fromSocket: string, data: RTCMessage
       const answer = await targetPc.createAnswer()
       targetPc.setLocalDescription(answer)
       console.log(`create answer ${answer}`)
-      sendMessage(roomId, answer)
+      sendMessage(roomId, answer, fromSocket)
     }
   }
 })

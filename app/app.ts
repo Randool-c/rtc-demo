@@ -46,9 +46,13 @@ const io = new socketIo.Server(httpsServer, {
 })
 
 io.on('connection', (socket) => {
-  socket.on('message', (room, data) => {
+  socket.on('message', (room, data, targetSocket?: string) => {
     logger.debug(`message, room: ${room}, data type: ${data.type} from socket ${socket.id}`)
-    socket.to(room).emit('message', room, socket.id, data)
+    if (!targetSocket) {
+      socket.to(room).emit('message', room, socket.id, data)
+    } else{
+      socket.to(targetSocket).emit('message', room, socket.id, data)
+    }
   })
 
   socket.on('join', async (room: string) => {
