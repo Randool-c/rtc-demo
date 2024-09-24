@@ -12,13 +12,17 @@
       </div>
     </div>
     <div class="videos">
-      <div class="video-wrapper">
-        <div class="video-wrapper__title">{{ state === 'joined' ? `local` : '' }}</div>
-        <video class="video-wrapper__video videos-wrapper__local" playsinline autoplay ref="localVideoRef" />
+      <div class=local-video>
+        <div class="video-wrapper">
+          <div class="video-wrapper__title">{{ state === 'joined' ? `local` : '' }}</div>
+          <video class="video-wrapper__video" playsinline autoplay ref="localVideoRef" />
+        </div>
       </div>
-      <div class="video-wrapper">
-        <div class="video-wrapper__title">{{ remoteUser }}</div>
-        <video class="videos-wrapper__video videos-wrapper__remote" playsinline autoplay ref="remoteVideoRef" />
+      <div class="remote-video">
+        <div v-for="([remoteUser, _], idx) in sortedConnections" :key="remoteUser" class="video-wrapper">
+          <div class="video-wrapper__title">{{ remoteUser }}</div>
+          <video class="videos-wrapper__video" playsinline autoplay ref="remoteVideosRef" />
+        </div>
       </div>
     </div>
     <div class="messages"></div>
@@ -27,7 +31,7 @@
 
 <script lang="ts" setup>
 import { io } from 'socket.io-client';
-import { onBeforeUnmount, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch, watchEffect } from 'vue'
 import { createRTCPeerConnection, getLocalStreams } from './helpers';
 
 interface RTCCandidateMessage {
@@ -39,21 +43,28 @@ type RTCMessage = RTCCandidateMessage | RTCSessionDescriptionInit
 
 const RTCConfig = {
   iceServers: [
-    { urls: 'stun:42.193.125.56:8800', username: 'chenst', credential: '123456'},
-    { urls: 'turn:42.193.125.56:8805', username: 'chenst', credential: '123456'}
+    { urls: 'stun:42.193.125.56:8800', username: 'chenst', credential: '123456' },
+    { urls: 'turn:42.193.125.56:8805', username: 'chenst', credential: '123456' }
   ],
 }
 
 const localVideoRef = ref()
-const remoteVideoRef = ref()
+const remoteVideosRef = ref()
 
 const roomId = ref('test')
 const socket = io('wss://42.193.125.56')
 const state = ref<'init' | 'joining' | 'joined'>('init')
 const remoteUser = ref<string>('')
 const localUser = ref<string>('')
-let currentPc: null | RTCPeerConnection = null;
+// let currentPc: null | RTCPeerConnection = null;
 let localStream: null | MediaStream = null;
+const pcs = ref(new Map<string, RTCPeerConnection>())
+const sortedConnections = computed<[string, RTCPeerConnection][]>(() => {
+  return Array.from(pcs.value.entries()).sort((item1, item2) => {
+    if (item1[0] <= item2[0]) return -1
+    else return 1
+  })
+})
 
 const enterRoom = async () => {
   // 创建rtcpeerconnection
@@ -77,10 +88,10 @@ const sendMessage = (roomId: string, data: RTCMessage) => {
   socket?.emit('message', roomId, data)
 }
 
-const initRTCPeerConnection = () => {
-  if (!currentPc) return
+const initRTCPeerConnection = (pc: RTCPeerConnection) => {
+  if (!pc) return
 
-  currentPc.onicecandidate = (e) => {
+  pc.onicecandidate = (e) => {
     if (e.candidate) {
       console.log(`oncandidate ${JSON.stringify(e.candidate.toJSON())}`)
       sendMessage(roomId.value, {
@@ -92,11 +103,11 @@ const initRTCPeerConnection = () => {
     }
   }
 
-  currentPc.ontrack = (event) => {
-    if (remoteVideoRef.value.srcObject !== event.streams[0]) {
-      remoteVideoRef.value.srcObject = event.streams[0]
-    }
-  }
+  // pc.ontrack = (event) => {
+  //   if (remoteVideoRef.value.srcObject !== event.streams[0]) {
+  //     remoteVideoRef.value.srcObject = event.streams[0]
+  //   }
+  // }
 }
 
 const createConnection = async () => {
@@ -125,16 +136,22 @@ socket.on('joined', async (roomId, socketId) => {
   state.value = 'joined'
 
   localVideoRef.value.srcObject = localStream
-  currentPc = createRTCPeerConnection(localStream, RTCConfig)
-  initRTCPeerConnection()
-  console.log('current pc: ', currentPc)
+  // currentPc = createRTCPeerConnection(localStream, RTCConfig)
+  // initRTCPeerConnection()
+  // console.log('current pc: ', currentPc)
   localUser.value = socketId
 })
 
-socket.on('other_join', (roomId, socketId) => {
+socket.on('other_join', async (roomId, socketId) => {
   console.log(`other end join; roomId: ${roomId} socketId: ${socketId}`)
   remoteUser.value = socketId
-  createConnection()
+  const newPc = createRTCPeerConnection(localStream, RTCConfig)
+  initRTCPeerConnection(newPc)
+  pcs.value.set(socketId, newPc)
+  await nextTick()
+  setTimeout(() => {
+    createConnection(newPc)
+  })
 })
 
 socket.on('left', (roomId, socketId) => {
@@ -181,6 +198,9 @@ socket.on('message', async (roomId: string, data: RTCMessage) => {
 
 socket.on('full', () => {
   alert('房间已满，请稍后重试')
+})
+
+watchEffect(() => {
 })
 
 onBeforeUnmount(() => {

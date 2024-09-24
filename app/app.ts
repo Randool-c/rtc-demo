@@ -23,9 +23,10 @@ app.all('*', (req, res, next) => {
   }
 })
 
-app.use(express.static(path.resolve(__dirname, '../docs')))
+app.use('/rtc-demo', express.static(path.resolve(__dirname, '../docs')))
+console.log('static dir: ', path.resolve(__dirname, '../docs'))
 
-app.get('/rtc-demo', (req, res) => {
+app.get('/rtc-demo/', (req, res) => {
   res.sendFile('./index.html', {root: path.resolve(__dirname, '../docs')})
 })
 
@@ -39,7 +40,8 @@ const options = {
 const httpsServer = https.createServer(options, app)
 const io = new socketIo.Server(httpsServer, {
   cors: {
-    origin: ['*', 'https://randool-c.github.io']
+    origin: ['https://randool-c.github.io', 'https://42.193.125.56'],
+    credentials: true
   }
 })
 
@@ -75,6 +77,11 @@ io.on('connection', (socket) => {
     socket.emit('left', room, socket.id)
   })
 
+  // socket.on('disconnect', () => {
+  //   socket.rooms.forEach((room) => {
+  //     socket.to(room).emit('bye', room, socket.id)
+  //   })
+  // })
 })
 
 httpsServer.listen(443, '0.0.0.0')
