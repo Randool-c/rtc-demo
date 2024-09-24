@@ -191,8 +191,8 @@ onBeforeUnmount(() => {
 <style lang="scss" scoped>
 .video-wrapper {
   &__video {
-    width: 640px;
-    height: 360px;
+    width: 360px;
+    height: 240px;
     object-fit: cover;
     object-position: 50% 50%;
   }

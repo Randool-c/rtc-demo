@@ -1,7 +1,11 @@
 export const getLocalStreams = async () => {
   const stream = await navigator.mediaDevices.getUserMedia?.({
     audio: true,
-    video: true
+    video: {
+      facingMode: 'user',
+      width: 360,
+      height: 240
+    }
   })
   if (!stream) {
     throw new Error('未找到媒体设备')

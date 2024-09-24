@@ -23,10 +23,10 @@ app.all('*', (req, res, next) => {
   }
 })
 
-app.use(express.static(path.resolve(__dirname, './dist')))
+app.use(express.static(path.resolve(__dirname, '../docs')))
 
-app.get('/', (req, res) => {
-  res.sendFile('./index.html', {root: path.resolve(__dirname, './dist')})
+app.get('/rtc-demo', (req, res) => {
+  res.sendFile('./index.html', {root: path.resolve(__dirname, '../docs')})
 })
 
 const httpServer = http.createServer(app)
