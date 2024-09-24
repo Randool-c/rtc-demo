@@ -114,14 +114,41 @@ const initRTCPeerConnection = (socketId: string, pc: RTCPeerConnection) => {
   }
 }
 
-const createConnection = async (pc: RTCPeerConnection) => {
-  if (!pc) return
+const createConnections = async (socketIds: string[]) => {
+  for (let socketId of socketIds) {
+    const newPc = createRTCPeerConnection(localStream, RTCConfig)
+    initRTCPeerConnection(socketId, newPc)
+    pcs.value.set(socketId, newPc)
+  }
 
-  const offer = await pc.createOffer()
-  console.log(`create offer ${offer} to the end`)
-  await pc.setLocalDescription(offer)
-  sendMessage(roomId.value, offer)
+  await nextTick()
+  let offer;
+  for (let socketId of socketIds) {
+    const pc = pcs.value.get(socketId)
+    if (!pc) continue
+
+    offer = await pc.createOffer()
+    await pc.setLocalDescription(offer)
+  }
+  offer && sendMessage(roomId.value, offer)
 }
+
+// const createConnections = async (pcs: RTCPeerConnection[]) => {
+//   let offer;
+//   for (let pc of pcs) {
+//     if (!pc) continue;
+//     offer = await createOffer(pc)
+//   }
+//   sendMessage(roomId.value, offer)
+// }
+
+// const createOffer = async (pc: RTCPeerConnection) => {
+//   const offer = await pc.createOffer()
+//   console.log(`create offer ${offer} to the end`)
+//   await pc.setLocalDescription(offer)
+//   sendMessage(roomId.value, offer)
+//   return offer;
+// }
 
 socket.on('connect', () => {
   console.log('socket connected')
@@ -145,15 +172,8 @@ socket.on('joined', async (roomId: string, socketId: string, roomSockets: string
   // console.log('current pc: ', currentPc)
   localUser.value = socketId
 
-  // 为和房间中已有的每个用户创建一个rtcpeerconnection，但是不需要建立连接
-  for (let socketId of roomSockets) {
-    const newPc = createRTCPeerConnection(localStream, RTCConfig)
-    initRTCPeerConnection(socketId, newPc)
-    pcs.value.set(socketId, newPc)
-    // setTimeout(() => {
-    //   createConnection(newPc)
-    // })
-  }
+  // 为和房间中已有的每个用户创建一个rtcpeerconnection并申请建立连接
+  createConnections(roomSockets)
 })
 
 socket.on('other_join', async (roomId, socketId) => {
@@ -165,9 +185,9 @@ socket.on('other_join', async (roomId, socketId) => {
   // await nextTick()
   // console.assert(remoteVideosRef.value.length === sortedConnections.value.length)
   // const index = sortedConnections.value.findIndex(([sid]) => sid === socketId)
-  setTimeout(() => {
-    createConnection(newPc)
-  })
+  // setTimeout(() => {
+  //   createConnection(newPc)
+  // })
 })
 
 socket.on('left', (roomId, socketId) => {
