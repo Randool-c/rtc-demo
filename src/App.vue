@@ -229,4 +229,10 @@ onBeforeUnmount(() => {
     object-position: 50% 50%;
   }
 }
+
+.remote-video {
+  display: flex;
+  flex-flow: row wrap;
+  gap: 10px;
+}
 </style>
