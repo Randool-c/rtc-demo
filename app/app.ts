@@ -47,17 +47,18 @@ const io = new socketIo.Server(httpsServer, {
 
 io.on('connection', (socket) => {
   socket.on('message', (room, data) => {
-    logger.debug(`message, room: ${room}, data, type: ${data.type}`)
+    logger.debug(`message, room: ${room}, data type: ${data.type} from socket ${socket.id}`)
     socket.to(room).emit('message', room, socket.id, data)
   })
 
   socket.on('join', async (room: string) => {
-    const nUsers = (await io.in(room).allSockets()).size
+    const allSockets = await io.in(room).allSockets()
+    const nUsers = allSockets.size
     logger.debug(`room ${room} has ${nUsers} users for socket id ${socket.id}`)
 
     if (nUsers < MAX_USER) {
       await socket.join(room);
-      socket.emit('joined', room, socket.id)
+      socket.emit('joined', room, socket.id, Array.from(allSockets))
 
       if (nUsers >= 1) {
         socket.to(room).emit('other_join', room, socket.id)
