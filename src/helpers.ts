@@ -14,7 +14,15 @@ export const getLocalStreams = async () => {
   }
 }
 
-export const createRTCPeerConnection = (stream: MediaStream | null, config?: RTCConfiguration) => {
+export const createRTCPeerConnection = async (config?: RTCConfiguration) => {
+  const stream = await navigator.mediaDevices.getUserMedia?.({
+    audio: true,
+    video: {
+      facingMode: 'user',
+      width: 360,
+      height: 240
+    }
+  })
   const pc = new RTCPeerConnection(config)
   if (stream) {
     const audioTrack = stream.getAudioTracks()[0]

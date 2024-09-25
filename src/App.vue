@@ -6,7 +6,7 @@
         <input class="room-id" id="room-id" type="text" v-model="roomId" />
       </div>
       <div class="config__submits">
-        <button class="btn-enter" :disable="state === 'joined'" @click="enterRoom">enter</button>
+        <button class="btn-enter" :disabled="state === 'joined'" @click="enterRoom">enter</button>
         <span v-if="state === 'joining'">进入房间中。。。</span>
         <button class="btn-exit" @click="exitRoom">exit</button>
       </div>
@@ -21,7 +21,7 @@
       <div class="remote-video">
         <div v-for="([remoteUser]) in sortedConnections" :key="remoteUser" class="video-wrapper">
           <div class="video-wrapper__title">{{ remoteUser }}</div>
-          <video class="videos-wrapper__video" playsinline autoplay ref="remoteVideosRef" />
+          <video class="videos-wrapper__video" playsinline autoplay :ref="(el: any) => (remoteVideosRef[remoteUser] = el)" />
         </div>
       </div>
     </div>
@@ -49,7 +49,7 @@ const RTCConfig = {
 }
 
 const localVideoRef = ref()
-const remoteVideosRef = ref()
+const remoteVideosRef = ref<{[key: string]: HTMLMediaElement | null}>({})
 
 const roomId = ref('test')
 const socket = io('wss://42.193.125.56')
@@ -58,9 +58,8 @@ const remoteUser = ref<string>('')
 const localUser = ref<string>('')
 // let currentPc: null | RTCPeerConnection = null;
 let localStream: null | MediaStream = null;
-const pcs = ref(new Map<string, RTCPeerConnection>())
-const streams = ref(new Map<string, MediaStream>())
-const sortedConnections = computed<[string, RTCPeerConnection][]>(() => {
+const pcs = ref(new Map<string, Promise<RTCPeerConnection>>())
+const sortedConnections = computed<[string, Promise<RTCPeerConnection>][]>(() => {
   return Array.from(pcs.value.entries()).sort((item1, item2) => {
     if (item1[0] <= item2[0]) return -1
     else return 1
@@ -89,10 +88,17 @@ const sendMessage = (roomId: string, data: RTCMessage, targetSocket?: string) =>
   socket?.emit('message', roomId, data, targetSocket)
 }
 
-const initRTCPeerConnection = (socketId: string, pc: RTCPeerConnection, targetSocket: string) => {
-  if (!pc) return
+const initRTCPeerConnection = async (targetSocket: string) => {
+  const stream = localStream
+  const pc = new RTCPeerConnection(RTCConfig)
+  if (stream) {
+    const audioTrack = stream.getAudioTracks()[0]
+    const videoTrack = stream.getVideoTracks()[0]
+    pc.addTrack(audioTrack, stream)
+    pc.addTrack(videoTrack, stream)
+  }
 
-  pc.onicecandidate = (e) => {
+  (!pc.onicecandidate) && (pc.onicecandidate = (e) => {
     if (e.candidate) {
       // console.log(`oncandidate ${JSON.stringify(e.candidate.toJSON())}`)
       sendMessage(roomId.value, {
@@ -102,29 +108,29 @@ const initRTCPeerConnection = (socketId: string, pc: RTCPeerConnection, targetSo
     } else {
       console.log('ice candidate collection end');
     }
-  }
+  });
 
-  pc.ontrack = (event) => {
-      const index = sortedConnections.value.findIndex(([sid]) => sid === socketId)
-      const el = remoteVideosRef.value[index]
-      console.log('on track !', el, event.streams[0])
+  !pc.ontrack && (pc.ontrack = async (event) => {
+      const el = remoteVideosRef.value[targetSocket]!
+      console.log('on track !', el, targetSocket)
       if (el.srcObject !== event.streams[0]) {
         el.srcObject = event.streams[0]
       }
-  }
+  });
+  return pc
 }
 
 const createConnections = async (socketIds: string[]) => {
   for (let socketId of socketIds) {
-    const newPc = createRTCPeerConnection(localStream, RTCConfig)
-    initRTCPeerConnection(socketId, newPc, socketId)
-    pcs.value.set(socketId, newPc)
+    const newPcPromise = initRTCPeerConnection(socketId)
+    pcs.value.set(socketId, newPcPromise)
+    await newPcPromise
   }
 
   await nextTick()
   let offer;
   for (let socketId of socketIds) {
-    const pc = pcs.value.get(socketId)
+    const pc = await pcs.value.get(socketId)
     if (!pc) continue
 
     offer = await pc.createOffer()
@@ -133,22 +139,16 @@ const createConnections = async (socketIds: string[]) => {
   offer && sendMessage(roomId.value, offer)
 }
 
-// const createConnections = async (pcs: RTCPeerConnection[]) => {
-//   let offer;
-//   for (let pc of pcs) {
-//     if (!pc) continue;
-//     offer = await createOffer(pc)
-//   }
-//   sendMessage(roomId.value, offer)
-// }
+const createConnection = async (targetSocket: string) => {
+  const newPcPromise = initRTCPeerConnection(targetSocket)
+  pcs.value.set(targetSocket, newPcPromise)
+  const newPc = await newPcPromise
 
-// const createOffer = async (pc: RTCPeerConnection) => {
-//   const offer = await pc.createOffer()
-//   console.log(`create offer ${offer} to the end`)
-//   await pc.setLocalDescription(offer)
-//   sendMessage(roomId.value, offer)
-//   return offer;
-// }
+  if (!newPc) return
+  const offer = await newPc.createOffer()
+  await newPc.setLocalDescription(offer)
+  sendMessage(roomId.value, offer, targetSocket)
+}
 
 socket.on('connect', () => {
   console.log('socket connected')
@@ -167,30 +167,15 @@ socket.on('joined', async (roomId: string, socketId: string, roomSockets: string
   state.value = 'joined'
 
   localVideoRef.value.srcObject = localStream
-  // currentPc = createRTCPeerConnection(localStream, RTCConfig)
-  // initRTCPeerConnection()
-  // console.log('current pc: ', currentPc)
   localUser.value = socketId
-
-  // 为和房间中已有的每个用户创建一个rtcpeerconnection并申请建立连接
-  createConnections(roomSockets)
 })
 
 socket.on('other_join', async (roomId, socketId) => {
   console.log(`other end join; roomId: ${roomId} socketId: ${socketId}`)
-  // remoteUser.value = socketId
-  // const newPc = createRTCPeerConnection(localStream, RTCConfig)
-  // initRTCPeerConnection(socketId, newPc)
-  // pcs.value.set(socketId, newPc)
-  // await nextTick()
-  // console.assert(remoteVideosRef.value.length === sortedConnections.value.length)
-  // const index = sortedConnections.value.findIndex(([sid]) => sid === socketId)
-  // setTimeout(() => {
-  //   createConnection(newPc)
-  // })
+  createConnection(socketId)
 })
 
-socket.on('left', (roomId, socketId) => {
+socket.on('left', async (roomId, socketId) => {
   console.log(`received left message; room id is: ${roomId}; socket id is: ${socketId}`)
   state.value = 'init'
 
@@ -200,14 +185,14 @@ socket.on('left', (roomId, socketId) => {
   localVideoRef.value.srcObject = null
   localStream = null
   for (let otherSocket of pcs.value.keys()) {
-    pcs.value.get(otherSocket)?.close()
+    (await pcs.value.get(otherSocket))?.close()
     pcs.value.delete(otherSocket)
   }
 })
 
-socket.on('bye', (roomId, socketId) => {
-  console.log(`other user left; room id is: ${roomId}; socket id is: ${socketId}`)
-  pcs.value.get(socketId)?.close()
+socket.on('bye', async (roomId, socketId) => {
+  console.log(`other user left; room id is: ${roomId}; socket id is: ${socketId}`);
+  (await pcs.value.get(socketId))?.close()
   pcs.value.delete(socketId)
 })
 
@@ -215,12 +200,14 @@ socket.on('message', async (roomId: string, fromSocket: string, data: RTCMessage
   console.log(`received message type ${data.type} from ${fromSocket}; room id is ${roomId}; data is ${JSON.stringify(data)}`)
   if (!data) return
 
-  let targetPc = pcs.value.get(fromSocket)
-  if (!targetPc) {
-    targetPc = createRTCPeerConnection(localStream, RTCConfig)
-    initRTCPeerConnection(fromSocket, targetPc, fromSocket)
-    pcs.value.set(fromSocket, targetPc)
-  }
+  let targetPcPromise = pcs.value.get(fromSocket)
+  if (!targetPcPromise) {
+    targetPcPromise = initRTCPeerConnection(fromSocket)
+    pcs.value.set(fromSocket, targetPcPromise)
+  } 
+  const targetPc = await targetPcPromise
+  if (!targetPc) return
+
   switch (data.type) {
     case 'candidate': {
       const newCandidate = new RTCIceCandidate(data.candidate)
@@ -244,21 +231,6 @@ socket.on('message', async (roomId: string, fromSocket: string, data: RTCMessage
 socket.on('full', () => {
   alert('房间已满，请稍后重试')
 })
-
-// watchEffect(() => {
-//   if (remoteVideosRef.value?.length !== sortedConnections.value?.length) return;
-//   const n = remoteVideosRef.value.length
-//   for (let i = 0; i < n; ++i) {
-//     if (!sortedConnections.value[i][1].ontrack) {
-//       sortedConnections.value[i][1].ontrack = (event) => {
-//         console.log(`ontrack from ${sortedConnections.value[i][0]}; remote video elemnt: `, remoteVideosRef.value[i], event.streams[0])
-//         if (remoteVideosRef.value[i].srcObject !== event.streams[0]) {
-//           remoteVideosRef.value[i].srcObject = event.streams[0]
-//         }
-//       }
-//     }
-//   }
-// }, { flush: 'post' })
 
 onBeforeUnmount(() => {
   socket.emit('leave')
