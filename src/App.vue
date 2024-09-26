@@ -25,14 +25,24 @@
         </div>
       </div>
     </div>
-    <div class="messages"></div>
+    <div class="input">
+      <input type="text"/>
+      <button>send message</button>
+    </div>
+    <div class="messages">
+      <div v-for="(messageItem, idx) in messageList" :key="idx" class="message">
+        <span class="message__user">{{ messageItem.user }}</span>
+        <span>说：</span>
+        <span class="message__content">{{ messageItem.content }}</span>
+      </div>
+    </div> 
   </div>
 </template>
 
 <script lang="ts" setup>
 import { io } from 'socket.io-client';
-import { computed, nextTick, onBeforeUnmount, ref, watchEffect } from 'vue'
-import { createRTCPeerConnection, getLocalStreams } from './helpers';
+import { computed, onBeforeUnmount, ref } from 'vue'
+import { getLocalStreams } from './helpers';
 
 interface RTCCandidateMessage {
   type: 'candidate';
@@ -40,6 +50,11 @@ interface RTCCandidateMessage {
 }
 
 type RTCMessage = RTCCandidateMessage | RTCSessionDescriptionInit
+
+interface MessageItem {
+  user: string;
+  content: string;
+}
 
 const RTCConfig = {
   iceServers: [
@@ -56,15 +71,18 @@ const socket = io('wss://42.193.125.56')
 const state = ref<'init' | 'joining' | 'joined'>('init')
 const remoteUser = ref<string>('')
 const localUser = ref<string>('')
-// let currentPc: null | RTCPeerConnection = null;
+
 let localStream: null | MediaStream = null;
-const pcs = ref(new Map<string, Promise<RTCPeerConnection>>())
+const pcs = ref(new Map<string, Promise<RTCPeerConnection>>());
+const datachannels = ref(new Map<string, RTCDataChannel>());
 const sortedConnections = computed<[string, Promise<RTCPeerConnection>][]>(() => {
   return Array.from(pcs.value.entries()).sort((item1, item2) => {
     if (item1[0] <= item2[0]) return -1
     else return 1
   })
 })
+
+const messageList = ref<MessageItem[]>([])
 
 const enterRoom = async () => {
   // 创建rtcpeerconnection
@@ -120,23 +138,21 @@ const initRTCPeerConnection = async (targetSocket: string) => {
   return pc
 }
 
-const createConnections = async (socketIds: string[]) => {
-  for (let socketId of socketIds) {
-    const newPcPromise = initRTCPeerConnection(socketId)
-    pcs.value.set(socketId, newPcPromise)
-    await newPcPromise
+const initDataChannel = (datachannel: RTCDataChannel, remoteSocket: string) => {
+  datachannel.onopen = () => {
+    console.log(`datachannel to ${remoteSocket} open`)
   }
 
-  await nextTick()
-  let offer;
-  for (let socketId of socketIds) {
-    const pc = await pcs.value.get(socketId)
-    if (!pc) continue
-
-    offer = await pc.createOffer()
-    await pc.setLocalDescription(offer)
+  datachannel.onmessage = (event) => {
+    messageList.value.push({
+      user: remoteSocket,
+      content: event.data
+    })
   }
-  offer && sendMessage(roomId.value, offer)
+
+  datachannel.onclose = () => {
+    console.log(`datachannel to ${remoteSocket} close`)
+  }
 }
 
 const createConnection = async (targetSocket: string) => {
@@ -145,6 +161,11 @@ const createConnection = async (targetSocket: string) => {
   const newPc = await newPcPromise
 
   if (!newPc) return
+
+  const datachannel =  newPc.createDataChannel('chat')
+  initDataChannel(datachannel, targetSocket)
+  datachannels.value.set(targetSocket, datachannel)
+
   const offer = await newPc.createOffer()
   await newPc.setLocalDescription(offer)
   sendMessage(roomId.value, offer, targetSocket)
@@ -206,6 +227,11 @@ socket.on('message', async (roomId: string, fromSocket: string, data: RTCMessage
     pcs.value.set(fromSocket, targetPcPromise)
   } 
   const targetPc = await targetPcPromise
+  targetPc.ondatachannel = (event) => {
+    const datachannel = event.channel
+    initDataChannel(datachannel, fromSocket)
+    datachannels.value.set(fromSocket, datachannel)
+  }
   if (!targetPc) return
 
   switch (data.type) {
