@@ -26,12 +26,12 @@
       </div>
     </div>
     <div class="input">
-      <input type="text"/>
-      <button>send message</button>
+      <input v-model="inputText" type="text"/>
+      <button @click="sendTextMessage" :disabled="state !== 'joined'">send message</button>
     </div>
     <div class="messages">
       <div v-for="(messageItem, idx) in messageList" :key="idx" class="message">
-        <span class="message__user">{{ messageItem.user }}</span>
+        <span class="message__user">{{ messageItem.user }}{{ localUser === messageItem.user ? '(我)' : '' }}</span>
         <span>说：</span>
         <span class="message__content">{{ messageItem.content }}</span>
       </div>
@@ -83,6 +83,7 @@ const sortedConnections = computed<[string, Promise<RTCPeerConnection>][]>(() =>
 })
 
 const messageList = ref<MessageItem[]>([])
+const inputText = ref('')
 
 const enterRoom = async () => {
   // 创建rtcpeerconnection
@@ -144,6 +145,7 @@ const initDataChannel = (datachannel: RTCDataChannel, remoteSocket: string) => {
   }
 
   datachannel.onmessage = (event) => {
+    console.log(`收到来自${remoteSocket}的消息：${event.data}`)
     messageList.value.push({
       user: remoteSocket,
       content: event.data
@@ -169,6 +171,20 @@ const createConnection = async (targetSocket: string) => {
   const offer = await newPc.createOffer()
   await newPc.setLocalDescription(offer)
   sendMessage(roomId.value, offer, targetSocket)
+}
+
+const sendTextMessage = () => {
+  for (let [remoteSocket, datachannel] of datachannels.value.entries()) {
+    if (datachannel.readyState === 'open') {
+      console.log(`发送给${remoteSocket}的消息${inputText.value}失败`)
+      datachannel.send(inputText.value)
+    }
+  }
+  messageList.value.push({
+    user: localUser.value,
+    content: inputText.value
+  })
+  inputText.value = ''
 }
 
 socket.on('connect', () => {
@@ -228,6 +244,8 @@ socket.on('message', async (roomId: string, fromSocket: string, data: RTCMessage
   } 
   const targetPc = await targetPcPromise
   targetPc.ondatachannel = (event) => {
+    console.log(`接收到远端${fromSocket}发送过来的datachannel`)
+    console.log(event.channel)
     const datachannel = event.channel
     initDataChannel(datachannel, fromSocket)
     datachannels.value.set(fromSocket, datachannel)
